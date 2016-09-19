@@ -1,0 +1,17 @@
+[package]
+name = "adb"
+version = "0.1.0"
+authors = ["Harry Brundage <harry.brundage@gmail.com>"]
+build = "build.rs"
+
+[dependencies]
+env_logger = "0.3.5"
+log = "0.3.6"
+lalrpop-util = "0.12.0"
+
+[build-dependencies]
+lalrpop = "0.12.0"
+
+[replace]
+"lalrpop-util:0.12.0" = { path = "/Users/hornairs/Code/lalrpop/lalrpop-util" }
+"lalrpop:0.12.0" = { path = "/Users/hornairs/Code/lalrpop/lalrpop" }

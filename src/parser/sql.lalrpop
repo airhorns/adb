@@ -1,0 +1,117 @@
+use super::ast::*;
+// SELECT title AS album, name AS artist
+// FROM album, artist
+// WHERE album.artistid = artist.artistid;
+
+grammar;
+
+Comma<T>: Vec<T> = {
+    <e:T> <v:(<T> ",")*> => {
+        let mut v = v;
+        v.insert(0, e);
+        v
+    }
+};
+
+pub Statement: Box<Statement> = {
+    <Query> ";"? => Box::new(Statement::Select(<>)),
+    <Insert> ";"? => Box::new(Statement::Insert(<>))
+};
+
+Query: SelectStatement = {
+  "SELECT" <selection:Comma<SelectItem>> <from:QueryFrom?> <condition:QueryWhere?> => {
+      let from: Vec<Relation> = match from {
+          None => Vec::new(),
+          Some(v) => v
+      };
+      SelectStatement { selections: selection, from_relation: from, where_condition: condition }
+  }
+};
+
+QueryFrom: Vec<Relation> = "FROM" <Comma<Relation>>;
+QueryWhere: Box<Expression> = "WHERE" <Expression> => Box::new(<>);
+
+Insert: InsertStatement = {
+    "INSERT INTO" <Relation> => InsertStatement { into_relation: <> }
+};
+
+SelectItem: SelectItem = {
+    Expression => SelectItem::Expression(<>),
+    <QualifiedName> "." "*" => SelectItem::SelectAll(Some(<>)),
+    "*" => SelectItem::SelectAll(None)
+};
+
+Relation: Relation = {
+    QualifiedName => Relation::Named(<>)
+    // "(" Query ")" => ,
+};
+
+#[inline]
+QualifiedName: QualifiedName = {
+    <e:Identifier> <v:("." <Identifier>)*> => {
+        let mut v = v;
+        v.insert(0, e);
+        v
+    }
+};
+
+Identifier: Identifier = {
+    r#""[^"]*""# => Identifier::from(<>),
+    r"[a-zA-Z_][a-zA-Z0-9@:_]*" => Identifier::from(<>)
+    // <a:Letter> <b:IdentChar*> => Identifier::from(String::from(a) + b)
+    // <a:r"_"> <b:IdentChar+> => Identifier::from(String::from(a) + b)
+    // <a:Digit> <b:IdentChar+> => Identifier::from(String::from(a) + b)
+};
+
+Expression: Expression = {
+    ValueExpression,
+    BooleanExpression,
+    // "NOT" <BooleanExpression> => ,
+    // <left:BooleanExpression> "AND" <right:BooleanExpression> => ,
+    // <left:BooleanExpression> "OR" <right:BooleanExpression> => ,
+};
+
+BooleanExpression: Expression = {
+    <left:ValueExpression> <operator:ComparisonOperator> <right:ValueExpression> =>
+        Expression::BooleanExpression {left: Box::new(left), right: Box::new(right), operator: operator},
+    // <left:ValueExpression> "NOT"? "IN" <right:Comma<BooleanExpression>> => ,
+};
+
+ValueExpression: Expression = {
+    "NULL" => Expression::NullLiteral,
+    Number => Expression::NumberLiteral(String::from(<>)),
+    Boolean => Expression::BooleanLiteral(String::from(<>)),
+    QualifiedName => Expression::QualifiedNameReference(<>),
+    "(" <Expression> ")" => Expression::ParenthesizedExpression(Box::new(<>))
+};
+
+Number = {
+    "r[0-9]+",
+    "r[0-9]+\.[0-9]*",
+    "r\.[0-9]+",
+};
+
+Boolean = {
+    "TRUE",
+    "FALSE"
+};
+
+// IdentChar: str = {
+//     Letter,
+//     Digit,
+//     r"_",
+//     r"@",
+//     r":"
+// };
+//
+// Letter: str = r"[a-zA-Z]";
+// Digit: str = r"[0-9]";
+
+ComparisonOperator: ComparisonOperator = {
+    "=" => ComparisonOperator::Equals,
+    "!=" => ComparisonOperator::NotEquals,
+    ">" => ComparisonOperator::GreaterThan,
+    ">=" => ComparisonOperator::GreaterThanEquals,
+    "<" => ComparisonOperator::LessThan,
+    "<=" => ComparisonOperator::LessThanEquals
+};
